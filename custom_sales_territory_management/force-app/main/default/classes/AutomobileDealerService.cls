@@ -26,6 +26,19 @@ public class AutomobileDealerService
         return null;
     }
 
+    // Three sales representatives at most can be assigned to a single zip code.
+    private Boolean IsZipCodeAssignable(String zipCode)
+    {
+        Integer count = 0;
+        for (Territory__c territory : this.Territories)
+        {
+            if (territory.Zip_Code__c == zipCode)
+                count++;
+        }
+
+        return count <= 3;
+    }
+
     public AutomobileDealerService()
     {
         this.ZipCodeAccountsHistory = 
@@ -37,7 +50,7 @@ public class AutomobileDealerService
 
         this.Territories = 
         [
-            SELECT Id, Zip_Code__c
+            SELECT Id, Zip_Code__c, Owner__c
             FROM Territory__c
         ];
 
@@ -70,11 +83,16 @@ public class AutomobileDealerService
     public Account ReassignAccountOwner(Account dealerAccount)
     {
         Territory__c associatedTerritory = this.GetTerritoryByZipCode(dealerAccount.BillingPostalCode);
-        
-        if (associatedTerritory != null)
+        Boolean isAssignable = this.IsZipCodeAssignable(dealerAccount.BillingPostalCode);
+
+        if (associatedTerritory != null && isAssignable)
         {
             dealerAccount.OwnerId = associatedTerritory.Owner__c;
             return dealerAccount;
+        }
+        else if (!isAssignable)
+        {
+            associatedTerritory.addError('The zip code is already assigned to three sales representatives');
         }
 
         return null;
