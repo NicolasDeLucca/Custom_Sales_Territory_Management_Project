@@ -7,10 +7,20 @@ public class AutomobileDealerService
     
     private Territory__c GetTerritoryByZipCode(String zipCode)
     {
+        List<Territory__c> possibleTerritories = new List<Territory__c>();
         for (Territory__c territory : this.Territories)
         {
             if (territory.Zip_Code__c == zipCode)
-                return territory;
+                possibleTerritories.add(territory);
+        }
+
+        Integer territoriesSize = possibleTerritories.size();
+        if (territoriesSize > 0)
+        {
+            // use a random function to select one of the assigned sales representatives
+            Integer randomInt = Math.floor(Math.random()).intValue();
+            Integer randomIndex = Math.Mod(randomInt, territoriesSize);
+            return possibleTerritories[randomIndex];
         }
 
         return null;
