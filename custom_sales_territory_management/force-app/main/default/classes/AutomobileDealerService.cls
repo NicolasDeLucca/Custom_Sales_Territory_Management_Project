@@ -4,6 +4,7 @@ public class AutomobileDealerService
     private List<Territory__c> Territories { get; private set; }
     private List<Contact> dealersEmployees { get; private set; }
     private List<Opportunity> dealerOpportunities { get; private set; }
+    private List<Assignment_History__c> assignmentsHistory { get; set; }
     
     private Territory__c GetTerritoryByZipCode(String zipCode)
     {
@@ -81,7 +82,7 @@ public class AutomobileDealerService
             Changed_By__c = createdById
         );
 
-        this.AssignmentsHistory.add(newAssignment);
+        this.assignmentsHistory.add(newAssignment);
     }
 
     public AutomobileDealerService()
@@ -111,13 +112,11 @@ public class AutomobileDealerService
             FROM Opportunity
         ];
 
-        this.AssignmentsHistory = new List<Assignment_History__c>();
+        this.assignmentsHistory = new List<Assignment_History__c>();
     }
     
-    public List<Assignment_History__c> AssignmentsHistory { get; set; }
-    
     // Verifies if some Automobile Dealer's Zip Code has ever changed
-    public Boolean HasZipCodeChanged(Id dealerId)
+    private Boolean HasZipCodeChanged(Id dealerId)
     {
         for (AccountHistory history : this.ZipCodeAccountsHistory)
         {
@@ -129,7 +128,7 @@ public class AutomobileDealerService
     }
 
     // Change the Account Owner to the sales representative assigned to the new zip code
-    public Account ReassignAccountOwner(Account dealerAccount)
+    private Account ReassignAccountOwner(Account dealerAccount)
     {
         Territory__c associatedTerritory = this.GetTerritoryByZipCode(dealerAccount.BillingPostalCode);
         Boolean isAssignable = this.IsZipCodeAssignable(dealerAccount.BillingPostalCode);
@@ -164,7 +163,7 @@ public class AutomobileDealerService
     }
 
     // Change the Owner field of all the Account’s Contacts to the same sales rep
-    public List<Contact> ReassignContactsOwner(Account dealerAccount, Id newOwnerId)
+    private List<Contact> ReassignContactsOwner(Account dealerAccount, Id newOwnerId)
     {
         List<Contact> accountEmployees = new List<Contact>();
         for (Contact employee : this.dealersEmployees)
@@ -182,7 +181,7 @@ public class AutomobileDealerService
     }
 
     // Change the Owner field of all the Account’s Open Opportunities to the same sales rep
-    public List<Opportunity> ReassignOpenOpportunitiesOwner(Account dealerAccount, Id newOwnerId)
+    private List<Opportunity> ReassignOpenOpportunitiesOwner(Account dealerAccount, Id newOwnerId)
     {
         List<Opportunity> accountOpportunities = new List<Opportunity>();
         for (Opportunity opp : this.dealerOpportunities)
@@ -197,5 +196,52 @@ public class AutomobileDealerService
         }
 
         return accountOpportunities;
+    }
+
+    public void UpdateDataModelOwners(List<Account> updatedAccounts)
+    {
+        List<Contact> contactsToUpdate = new List<Contact>();
+        List<Opportunity> opportunitiesToUpdate = new List<Opportunity>();
+        List<Account> accountsToUpdate = new List<Account>();
+
+        for (Account updatedAcc : updatedAccounts)
+        {
+            if (!this.HasZipCodeChanged(updatedAcc.Id))
+            {
+                Account accountToUpdate = this.ReassignAccountOwner(updatedAcc);
+                if (accountToUpdate != null)
+                {
+                    List<Contact> newContactsToUpdate = 
+                        this.ReassignContactsOwner(updatedAcc, accountToUpdate.OwnerId);
+                    
+                    List<Opportunity> newOppsToUpdate = 
+                        this.ReassignOpenOpportunitiesOwner(updatedAcc, accountToUpdate.OwnerId);
+                    
+                    accountsToUpdate.add(accountToUpdate);
+                    contactsToUpdate.addAll(newContactsToUpdate);
+                    opportunitiesToUpdate.addAll(newOppsToUpdate);
+                }
+            }
+        }
+        
+        if (!accountsToUpdate.isEmpty())
+        {
+            update accountsToUpdate;
+        }
+
+        if (!contactsToUpdate.isEmpty())
+        {
+            update contactsToUpdate;
+        }
+
+        if (!opportunitiesToUpdate.isEmpty())
+        {
+            update opportunitiesToUpdate;
+        }
+
+        if (!this.assignmentsHistory.isEmpty())
+        {
+            insert this.assignmentsHistory;
+        }
     }
 }
