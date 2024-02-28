@@ -114,18 +114,6 @@ public class AutomobileDealerService
 
         this.assignmentsHistory = new List<Assignment_History__c>();
     }
-    
-    // Verifies if some Automobile Dealer's Zip Code has ever changed
-    private Boolean HasZipCodeChanged(Id dealerId)
-    {
-        for (AccountHistory history : this.ZipCodeAccountsHistory)
-        {
-            if (history.AccountId == dealerId)
-                return true;
-        }
-
-        return false;
-    }
 
     // Change the Account Owner to the sales representative assigned to the new zip code
     private Account ReassignAccountOwner(Account dealerAccount)
@@ -198,6 +186,23 @@ public class AutomobileDealerService
         return accountOpportunities;
     }
 
+    // Filters Automobile Dealers based on whether Zip Codes has ever changed
+    public List<Account> GetAccountsWithZipCodeChanged(List<Account> updatedAccounts)
+    {
+        List<Account> mappedAccounts = new List<Account>();
+
+        for (Account updatedAcc : updatedAccounts)
+        {
+            for (AccountHistory history : this.ZipCodeAccountsHistory)
+            {
+                if (history.AccountId == updatedAcc.Id)
+                    mappedAccounts.add(updatedAcc);
+            }
+        }
+
+        return mappedAccounts;
+    }
+
     public void UpdateDataModelOwners(List<Account> updatedAccounts)
     {
         List<Contact> contactsToUpdate = new List<Contact>();
@@ -206,21 +211,18 @@ public class AutomobileDealerService
 
         for (Account updatedAcc : updatedAccounts)
         {
-            if (!this.HasZipCodeChanged(updatedAcc.Id))
+            Account accountToUpdate = this.ReassignAccountOwner(updatedAcc);
+            if (accountToUpdate != null)
             {
-                Account accountToUpdate = this.ReassignAccountOwner(updatedAcc);
-                if (accountToUpdate != null)
-                {
-                    List<Contact> newContactsToUpdate = 
-                        this.ReassignContactsOwner(updatedAcc, accountToUpdate.OwnerId);
+                List<Contact> newContactsToUpdate = 
+                    this.ReassignContactsOwner(updatedAcc, accountToUpdate.OwnerId);
                     
-                    List<Opportunity> newOppsToUpdate = 
-                        this.ReassignOpenOpportunitiesOwner(updatedAcc, accountToUpdate.OwnerId);
+                List<Opportunity> newOppsToUpdate = 
+                    this.ReassignOpenOpportunitiesOwner(updatedAcc, accountToUpdate.OwnerId);
                     
-                    accountsToUpdate.add(accountToUpdate);
-                    contactsToUpdate.addAll(newContactsToUpdate);
-                    opportunitiesToUpdate.addAll(newOppsToUpdate);
-                }
+                accountsToUpdate.add(accountToUpdate);
+                contactsToUpdate.addAll(newContactsToUpdate);
+                opportunitiesToUpdate.addAll(newOppsToUpdate);
             }
         }
         
