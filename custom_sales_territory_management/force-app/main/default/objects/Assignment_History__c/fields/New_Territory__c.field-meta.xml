@@ -6,8 +6,8 @@
     <externalId>false</externalId>
     <label>New Territory</label>
     <referenceTo>Territory__c</referenceTo>
-    <relationshipLabel>Assignment New Territory Histories</relationshipLabel>
-    <relationshipName>Assignment_NewTerritory_Histories</relationshipName>
+    <relationshipLabel>Assignments New Territory History</relationshipLabel>
+    <relationshipName>Assignments_NewTerritory_History</relationshipName>
     <required>false</required>
     <trackTrending>false</trackTrending>
     <type>Lookup</type>

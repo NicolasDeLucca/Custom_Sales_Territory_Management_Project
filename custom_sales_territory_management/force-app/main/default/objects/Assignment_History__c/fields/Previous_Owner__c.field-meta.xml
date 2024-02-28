@@ -6,7 +6,7 @@
     <externalId>false</externalId>
     <label>Previous Owner</label>
     <referenceTo>User</referenceTo>
-    <relationshipName>Assignment_PrevOwner_Histories</relationshipName>
+    <relationshipName>Assignments_PrevOwner_History</relationshipName>
     <required>false</required>
     <trackTrending>false</trackTrending>
     <type>Lookup</type>

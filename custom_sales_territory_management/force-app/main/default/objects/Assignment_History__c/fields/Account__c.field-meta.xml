@@ -5,8 +5,8 @@
     <externalId>false</externalId>
     <label>Account</label>
     <referenceTo>Account</referenceTo>
-    <relationshipLabel>Assignment Account Histories</relationshipLabel>
-    <relationshipName>Assignment_Account_Histories</relationshipName>
+    <relationshipLabel>Assignments Account History</relationshipLabel>
+    <relationshipName>Assignments_Account_History</relationshipName>
     <relationshipOrder>0</relationshipOrder>
     <reparentableMasterDetail>false</reparentableMasterDetail>
     <trackTrending>false</trackTrending>
