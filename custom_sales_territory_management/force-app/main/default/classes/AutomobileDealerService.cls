@@ -39,11 +39,56 @@ public class AutomobileDealerService
         return count <= 3;
     }
 
+    private Territory__c SearchTerritory(String zipCode, Id ownerId)
+    {
+        for (Territory__c territory : this.Territories)
+        {
+            if (territory.Zip_Code__c == zipCode && territory.Owner__c == ownerId)
+                return territory;
+        }
+
+        return null;
+    }
+
+    private AccountHistory GetLastAutoDealerHistory(Id dealerAccountId)
+    {
+        AccountHistory lastHistory = null;
+        for (AccountHistory history : this.ZipCodeAccountsHistory)
+        {
+            if (history.AccountId == dealerAccountId)
+                lastHistory = history;
+        }
+
+        return lastHistory;
+    } 
+
+    private void StoreAssignmentHistory(
+        Id prevOwner, 
+        Id newOwner, 
+        Id prevTerritoryId, 
+        Id newTerritoryId, 
+        Id accountId, 
+        Id createdById
+    )
+    {
+        Assignment_History__c newAssignment = new Assignment_History__c
+        (
+            Previous_Owner__c = prevOwner,
+            New_Owner__c = newOwner,
+            Previous_Territory__c = prevTerritoryId,
+            New_Territory__c = newTerritoryId,
+            Account__c = accountId,
+            Changed_By__c = createdById
+        );
+
+        this.AssignmentsHistory.add(newAssignment);
+    }
+
     public AutomobileDealerService()
     {
         this.ZipCodeAccountsHistory = 
         [
-            SELECT AccountId
+            SELECT AccountId, Field, CreatedById
             FROM AccountHistory
             WHERE Field = 'BillingPostalCode'
         ];
@@ -65,7 +110,11 @@ public class AutomobileDealerService
             SELECT Id, OwnerId
             FROM Opportunity
         ];
+
+        this.AssignmentsHistory = new List<Assignment_History__c>();
     }
+    
+    public List<Assignment_History__c> AssignmentsHistory { get; set; }
     
     // Verifies if some Automobile Dealer's Zip Code has ever changed
     public Boolean HasZipCodeChanged(Id dealerId)
@@ -87,6 +136,22 @@ public class AutomobileDealerService
 
         if (associatedTerritory != null && isAssignable)
         {
+            AccountHistory prevAutoDealerHistory = this.GetLastAutoDealerHistory(dealerAccount.Id);
+            
+            Territory__c prevTerritory = this.SearchTerritory(
+                prevAutoDealerHistory.Field, 
+                dealerAccount.OwnerId
+            );
+
+            this.StoreAssignmentHistory(
+                dealerAccount.OwnerId, 
+                associatedTerritory.Owner__c,
+                prevTerritory.Id,
+                associatedTerritory.Id,
+                dealerAccount.Id,
+                prevAutoDealerHistory.CreatedById
+            );
+
             dealerAccount.OwnerId = associatedTerritory.Owner__c;
             return dealerAccount;
         }

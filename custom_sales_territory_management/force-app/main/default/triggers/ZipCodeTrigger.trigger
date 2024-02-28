@@ -25,19 +25,24 @@ trigger ZipCodeTrigger on Account (after update)
             }
         }
     }
+    
+    if (!accountsToUpdate.isEmpty())
+    {
+        update accountsToUpdate;
+    }
 
     if (!contactsToUpdate.isEmpty())
     {
         update contactsToUpdate;
     }
 
-    if (!accountsToUpdate.isEmpty())
-    {
-        update accountsToUpdate;
-    }
-
     if (!opportunitiesToUpdate.isEmpty())
     {
         update opportunitiesToUpdate;
+    }
+
+    if (!dealerService.AssignmentsHistory.isEmpty())
+    {
+        insert dealerService.AssignmentsHistory;
     }
 }
