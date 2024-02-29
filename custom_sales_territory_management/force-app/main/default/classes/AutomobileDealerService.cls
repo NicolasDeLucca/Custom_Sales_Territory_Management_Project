@@ -84,43 +84,13 @@ public class AutomobileDealerService
 
         this.assignmentsHistory.add(newAssignment);
     }
-
-    public AutomobileDealerService()
-    {
-        this.ZipCodeAccountsHistory = 
-        [
-            SELECT AccountId, Field, CreatedById
-            FROM AccountHistory
-            WHERE Field = 'BillingPostalCode'
-        ];
-
-        this.Territories = 
-        [
-            SELECT Id, Zip_Code__c, Owner__c
-            FROM Territory__c
-        ];
-
-        this.dealersEmployees = 
-        [
-            SELECT Id, AccountId 
-            FROM Contact
-        ];
-
-        this.dealerOpportunities = 
-        [
-            SELECT Id, OwnerId
-            FROM Opportunity
-        ];
-
-        this.assignmentsHistory = new List<Assignment_History__c>();
-    }
-
+    
     // Change the Account Owner to the sales representative assigned to the new zip code
     private Account ReassignAccountOwner(Account dealerAccount)
     {
         Territory__c associatedTerritory = this.GetTerritoryByZipCode(dealerAccount.BillingPostalCode);
         Boolean isAssignable = this.IsZipCodeAssignable(dealerAccount.BillingPostalCode);
-
+        
         if (associatedTerritory != null && isAssignable)
         {
             AccountHistory prevAutoDealerHistory = this.GetLastAutoDealerHistory(dealerAccount.Id);
@@ -186,18 +156,51 @@ public class AutomobileDealerService
         return accountOpportunities;
     }
 
+    public AutomobileDealerService()
+    {
+        this.ZipCodeAccountsHistory = 
+        [
+            SELECT AccountId, Field, CreatedById
+            FROM AccountHistory
+            WHERE Field = 'BillingPostalCode'
+        ];
+
+        this.Territories = 
+        [
+            SELECT Id, Zip_Code__c, Owner__c
+            FROM Territory__c
+        ];
+
+        this.dealersEmployees = 
+        [
+            SELECT Id, AccountId 
+            FROM Contact
+        ];
+
+        this.dealerOpportunities = 
+        [
+            SELECT Id, OwnerId
+            FROM Opportunity
+        ];
+
+        this.assignmentsHistory = new List<Assignment_History__c>();
+    }
+
     // Filters Automobile Dealers based on whether Zip Codes has ever changed
-    public List<Account> GetAccountsWithZipCodeChanged(List<Account> updatedAccounts)
+    public List<Account> GetAutoDealersWithZipCodeChanged(List<Account> updatedAccounts)
     {
         List<Account> mappedAccounts = new List<Account>();
 
         for (Account updatedAcc : updatedAccounts)
         {
+            Account lastAccount = null;
             for (AccountHistory history : this.ZipCodeAccountsHistory)
             {
                 if (history.AccountId == updatedAcc.Id)
-                    mappedAccounts.add(updatedAcc);
+                    lastAccount = updatedAcc;
             }
+            if (lastAccount != null)
+                mappedAccounts.add(lastAccount);
         }
 
         return mappedAccounts;
