@@ -4,6 +4,7 @@ public class AutomobileDealerService
     private List<Territory__c> Territories { get; private set; }
     private List<Contact> dealersEmployees { get; private set; }
     private List<Opportunity> dealerOpportunities { get; private set; }
+    private List<Account> automobileDealers { get; private set; }
     private List<Assignment_History__c> assignmentsHistory { get; set; }
     
     private Territory__c GetTerritoryByZipCode(String zipCode)
@@ -183,6 +184,12 @@ public class AutomobileDealerService
             FROM Opportunity
         ];
 
+        this.automobileDealers = 
+        [
+            SELECT Id, OwnerId, BillingPostalCode
+            FROM Account
+        ];
+
         this.assignmentsHistory = new List<Assignment_History__c>();
     }
 
@@ -204,6 +211,28 @@ public class AutomobileDealerService
         }
 
         return mappedAccounts;
+    }
+
+    public List<Account> GetAutoDealersWithTerritoryOwnerChanged(
+        Map<Id, Territory__c> oldTerritoriesMap, 
+        List<Territory__c> newTerritories
+    )
+    {
+        List<Account> accountsToUpdate = new List<Account>();
+        for (Territory__c updTerritory : newTerritories)
+        {
+            Territory__c oldTerritory = oldTerritoriesMap.get(updTerritory.Id);
+            if (updTerritory.Owner__c != oldTerritory.Owner__c)
+            {
+                for (Account acc : this.automobileDealers)
+                {
+                    if (acc.OwnerId == oldTerritory.Owner__c && acc.BillingPostalCode == updTerritory.Zip_Code__c)
+                        accountsToUpdate.add(acc);
+                }
+            }
+        }
+
+        return accountsToUpdate;
     }
 
     public void UpdateDataModelOwners(List<Account> updatedAccounts)
