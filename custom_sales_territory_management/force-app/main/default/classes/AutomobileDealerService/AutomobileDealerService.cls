@@ -97,7 +97,7 @@ public class AutomobileDealerService
             AccountHistory prevAutoDealerHistory = this.GetLastAutoDealerHistory(dealerAccount.Id);
             
             Territory__c prevTerritory = this.SearchTerritory(
-                prevAutoDealerHistory.Field, 
+                prevAutoDealerHistory.OldValue.toString(), 
                 dealerAccount.OwnerId
             );
 
@@ -161,7 +161,7 @@ public class AutomobileDealerService
     {
         this.ZipCodeAccountsHistory = 
         [
-            SELECT AccountId, Field, CreatedById
+            SELECT AccountId, Field, OldValue, CreatedById
             FROM AccountHistory
             WHERE Field = 'BillingPostalCode'
         ];
