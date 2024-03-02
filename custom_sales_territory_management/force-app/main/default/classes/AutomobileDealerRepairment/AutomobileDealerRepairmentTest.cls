@@ -158,10 +158,10 @@ private class AutomobileDealerRepairmentTest
         retrievedDealer.BillingPostalCode = ZIP_CODE_DEALER_TEST_2;
         update retrievedDealer;
 
-        insert new AccountHistory(
-            Account = retrievedDealer,
-            AccountId = retrievedDealer.Id,
-            Field = 'BillingPostalCode'
+        insert new cstm_AccountHistory__c(
+            Accounts__c = retrievedDealer.Id,
+            Field__c = 'BillingPostalCode',
+            OldValue__c = ZIP_CODE_DEALER_TEST_1
         );
 
         // Act

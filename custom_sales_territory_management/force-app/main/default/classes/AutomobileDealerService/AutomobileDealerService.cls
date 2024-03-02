@@ -1,6 +1,7 @@
 public class AutomobileDealerService
 {
-    private List<AccountHistory> ZipCodeAccountsHistory { get; private set; }
+    private List<cstm_AccountHistory__c> OldZipCodeAccountsHistory { get; private set; }
+    private List<cstm_AccountHistory__c> ZipCodeAccountsHistoryToInsert { get; private set; }
     private List<Territory__c> Territories { get; private set; }
     private List<Contact> dealersEmployees { get; private set; }
     private List<Opportunity> dealerOpportunities { get; private set; }
@@ -35,7 +36,7 @@ public class AutomobileDealerService
         for (Territory__c territory : this.Territories)
         {
             if (territory.Zip_Code__c == zipCode)
-                count++;
+                count ++;
         }
 
         return count <= 3;
@@ -52,12 +53,12 @@ public class AutomobileDealerService
         return null;
     }
 
-    private AccountHistory GetLastAutoDealerHistory(Id dealerAccountId)
+    private cstm_AccountHistory__c GetLastAutoDealerHistory(Id dealerAccountId)
     {
-        AccountHistory lastHistory = null;
-        for (AccountHistory history : this.ZipCodeAccountsHistory)
+        cstm_AccountHistory__c lastHistory = null;
+        for (cstm_AccountHistory__c history : this.OldZipCodeAccountsHistory)
         {
-            if (history.AccountId == dealerAccountId)
+            if (history.Accounts__c == dealerAccountId)
                 lastHistory = history;
         }
 
@@ -94,10 +95,10 @@ public class AutomobileDealerService
         
         if (associatedTerritory != null && isAssignable)
         {
-            AccountHistory prevAutoDealerHistory = this.GetLastAutoDealerHistory(dealerAccount.Id);
+            cstm_AccountHistory__c prevAutoDealerHistory = this.GetLastAutoDealerHistory(dealerAccount.Id);
             
             Territory__c prevTerritory = this.SearchTerritory(
-                prevAutoDealerHistory.OldValue.toString(), 
+                prevAutoDealerHistory.OldValue__c, 
                 dealerAccount.OwnerId
             );
 
@@ -159,13 +160,6 @@ public class AutomobileDealerService
 
     public AutomobileDealerService()
     {
-        this.ZipCodeAccountsHistory = 
-        [
-            SELECT AccountId, Field, OldValue, CreatedById
-            FROM AccountHistory
-            WHERE Field = 'BillingPostalCode'
-        ];
-
         this.Territories = 
         [
             SELECT Id, Zip_Code__c, Owner__c
@@ -190,7 +184,56 @@ public class AutomobileDealerService
             FROM Account
         ];
 
+        this.OldZipCodeAccountsHistory =
+        [
+            SELECT Accounts__c, OldValue__c, Field__c, CreatedById
+            FROM cstm_AccountHistory__c
+        ];
+
+        this.ZipCodeAccountsHistoryToInsert = new List<cstm_AccountHistory__c>();
         this.assignmentsHistory = new List<Assignment_History__c>();
+    }
+
+    // Save the dealers with new zip code in custom object AccountHistory records
+    public void SaveAccountHistory(List<Account> accountsToSave)
+    {
+        if (!accountsToSave.isEmpty())
+        {
+            String oldValue = null;
+            if (!this.OldZipCodeAccountsHistory.isEmpty())
+            {
+                Integer lastHistoryIndex = this.OldZipCodeAccountsHistory.size() - 1;
+                cstm_AccountHistory__c lastHistory = this.OldZipCodeAccountsHistory[lastHistoryIndex];
+                oldValue = lastHistory.OldValue__c;
+            }
+
+            cstm_AccountHistory__c newHistory = new cstm_AccountHistory__c
+            (
+                Accounts__c = accountsToSave[0].Id,
+                OldValue__c = oldValue,
+                Field__c = 'BillingPostalCode'
+            );
+
+            this.ZipCodeAccountsHistoryToInsert.add(newHistory);
+        }
+
+        for (Integer i = 1; i < accountsToSave.size(); i++)
+        {
+            Account prevAcc = accountsToSave[i-1];
+            Account actualAcc = accountsToSave[i];
+
+            cstm_AccountHistory__c newHistory = new cstm_AccountHistory__c
+            (
+                Accounts__c = actualAcc.Id,
+                OldValue__c = prevAcc.BillingPostalCode,
+                Field__c = 'BillingPostalCode'
+            );
+
+            this.ZipCodeAccountsHistoryToInsert.add(newHistory);
+        }
+
+        if (!this.ZipCodeAccountsHistoryToInsert.isEmpty())
+            insert this.ZipCodeAccountsHistoryToInsert;
     }
 
     // Filters Automobile Dealers based on whether Zip Codes has ever changed
@@ -201,9 +244,9 @@ public class AutomobileDealerService
         for (Account updatedAcc : updatedAccounts)
         {
             Account lastAccount = null;
-            for (AccountHistory history : this.ZipCodeAccountsHistory)
+            for (cstm_AccountHistory__c history : this.ZipCodeAccountsHistoryToInsert)
             {
-                if (history.AccountId == updatedAcc.Id)
+                if (history.Accounts__c == updatedAcc.Id)
                     lastAccount = updatedAcc;
             }
             if (lastAccount != null)
