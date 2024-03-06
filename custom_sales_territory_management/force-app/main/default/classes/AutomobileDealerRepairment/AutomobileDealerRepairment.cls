@@ -21,7 +21,10 @@ public class AutomobileDealerRepairment implements Schedulable
             Boolean isDealerInAnyTerritory = false;
             for (Territory__c territory : territories)
             {
-                if (territory.Zip_Code__c == dealer.BillingPostalCode && dealer.OwnerId == territory.Owner__c)
+                if (
+                    territory.Zip_Code__c == dealer.BillingPostalCode &&
+                    dealer.OwnerId == territory.Owner__c
+                )
                 {
                     isDealerInAnyTerritory = true;
                     break;
