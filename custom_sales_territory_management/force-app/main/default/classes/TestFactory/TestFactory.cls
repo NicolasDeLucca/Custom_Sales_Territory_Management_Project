@@ -23,7 +23,13 @@ public class TestFactory
             [
                 SELECT Id 
                 FROM Profile 
-                WHERE Name = 'Standard User'
+                WHERE Name = 'Force.com - Free User'
+            ].Id,
+            UserRoleId = 
+            [
+                SELECT Id 
+                FROM UserRole 
+                WHERE Name = 'Western Sales Team'
             ].Id
         );
 
@@ -45,36 +51,45 @@ public class TestFactory
             ].Id
         );
 
-        Id OwnerId1Test = 
+        User Owner1Test = 
         [
             SELECT Id 
             FROM User 
             WHERE Username = :OWNER_USERNAME_TEST_1
-        ].Id;
+        ];
 
-        insert new Territory__c(
-            Name = 'Territory test 1', 
-            Zip_Code__c = ZIP_CODE_DEALER_TEST_1, 
-            Owner__c = OwnerId1Test
-        ); 
+        System.runAs(Owner1Test)
+        {
+            insert new Territory__c(
+                Name = 'Territory test 1', 
+                Zip_Code__c = ZIP_CODE_DEALER_TEST_1, 
+                Owner__c = Owner1Test.Id
+            ); 
+        }
+
+        System.runAs(Owner1Test)
+        {
+            insert new Account(
+                Name = 'Dealer test 1', 
+                BillingPostalCode = ZIP_CODE_DEALER_TEST_1, 
+                OwnerId = Owner1Test.Id
+            );
+        }
         
-        Id OwnerId2Test = 
+        User Owner2Test = 
         [
             SELECT Id 
             FROM User 
             WHERE Username = :OWNER_USERNAME_TEST_2
-        ].Id;
+        ];
 
-        insert new Territory__c(
-            Name = 'Territory test 2', 
-            Zip_Code__c = ZIP_CODE_DEALER_TEST_2, 
-            Owner__c = OwnerId2Test
-        );
-
-        insert new Account(
-            Name = 'Dealer test 1', 
-            BillingPostalCode = ZIP_CODE_DEALER_TEST_1, 
-            OwnerId = OwnerId1Test
-        );
+        System.runAs(Owner2Test)
+        {
+            insert new Territory__c(
+                Name = 'Territory test 2', 
+                Zip_Code__c = ZIP_CODE_DEALER_TEST_2, 
+                Owner__c = Owner2Test.Id
+            );
+        }
     }
 }

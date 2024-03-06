@@ -5,7 +5,11 @@ private class AutomobileDealerServiceTest
     static void setUpCommonTestData()
     {
         TestFactory.insertTerritoryManagementData();
+    }
 
+    @isTest
+    static void correctOpportunitiesAndContactsOwnershipAssignmentTest()
+    {
         User Owner2Test = 
         [
             SELECT Id, FirstName, LastName
@@ -14,44 +18,42 @@ private class AutomobileDealerServiceTest
         ];
 
         // Create test automobile dealers correctly assigned to their territories
+        System.runAs(Owner2Test)
+        {
+            insert new Account(
+                Name = 'Dealer test 2', 
+                BillingPostalCode = TestFactory.ZIP_CODE_DEALER_TEST_2, 
+                OwnerId = Owner2Test.Id
+            );
 
-        insert new Account(
-            Name = 'Dealer test 2', 
-            BillingPostalCode = TestFactory.ZIP_CODE_DEALER_TEST_2, 
-            OwnerId = Owner2Test.Id
-        );
+            Id accountId = 
+            [
+                SELECT Id 
+                FROM Account 
+                WHERE OwnerId = :Owner2Test.Id
+            ].Id;
 
-        Id accountId = 
-        [
-            SELECT Id 
-            FROM Account 
-            WHERE OwnerId = :Owner2Test.Id
-        ].Id;
+            // Create a related contact for the second account
 
-        // Create a related contact for the second account
+            Contact newContact = new Contact(
+                FirstName = Owner2Test.FirstName, 
+                LastName = Owner2Test.LastName, 
+                AccountId = accountId,
+                OwnerId = Owner2Test.Id
+            );
+            insert newContact;
 
-        Contact newContact = new Contact(
-            FirstName = Owner2Test.FirstName, 
-            LastName = Owner2Test.LastName, 
-            AccountId = accountId,
-            OwnerId = Owner2Test.Id
-        );
-        insert newContact;
+            // Create a related open opportunity for the second account
+            
+            insert new Opportunity(
+                Name = 'Opportunity test', 
+                StageName = 'Prospecting', 
+                CloseDate = Date.today().addDays(1), 
+                AccountId = accountId, 
+                OwnerId = Owner2Test.Id
+            );
+        }
 
-        // Create a related open opportunity for the second account
-        
-        insert new Opportunity(
-            Name = 'Opportunity test', 
-            StageName = 'Prospecting', 
-            CloseDate = Date.today().addDays(1), 
-            AccountId = accountId, 
-            OwnerId = Owner2Test.Id
-        );
-    }
-
-    @isTest
-    static void correctOpportunitiesAndContactsOwnershipAssignmentTest()
-    {
         Account dealer1Test = 
         [
             SELECT Id, OwnerId
@@ -127,5 +129,136 @@ private class AutomobileDealerServiceTest
         
         System.assertEquals(openRelatedOpportunity.OwnerId, dealer2Test.OwnerId);
         System.assertEquals(relatedContact.OwnerId, dealer2Test.OwnerId);
+    }
+
+    @isTest
+    static void ThreeSalesRepsAtMostCanBeAssignedToAZipCodeTest()
+    {
+        // Create three more territories and three more sales reps related with the first dealer account
+        
+        Id appSubscriptionUserId = 
+        [
+            SELECT Id 
+            FROM Profile 
+            WHERE Name = 'Force.com - App Subscription User'
+        ].Id;
+
+        Id westernSalesTeamId =
+        [
+            SELECT Id 
+            FROM UserRole 
+            WHERE Name = 'Western Sales Team'
+        ].Id;
+
+        insert new User(
+            FirstName = 'Test', 
+            LastName = 'User 3',
+            Email = 'testuser3@gmail.com',
+            Username = 'testuser3@sunmotors.com',
+            Alias = 'user3',
+            TimeZoneSidKey = 'America/Los_Angeles',
+            EmailEncodingKey = 'UTF-8',
+            LocaleSidKey = 'en_US',
+            LanguageLocaleKey = 'en_US',
+            ProfileId = 
+            [
+                SELECT Id 
+                FROM Profile 
+                WHERE Name = 'Force.com - Free User'
+            ].Id,
+            UserRoleId = westernSalesTeamId
+        );
+
+        insert new User(
+            FirstName = 'Test', 
+            LastName = 'User 4',
+            Email = 'testuser4@gmail.com',
+            Username = 'testuser4@sunmotors.com',
+            Alias = 'user4',
+            TimeZoneSidKey = 'America/Los_Angeles',
+            LocaleSidKey = 'en_US',
+            LanguageLocaleKey = 'en_US',
+            EmailEncodingKey = 'UTF-8',
+            ProfileId = appSubscriptionUserId,
+            UserRoleId = westernSalesTeamId
+        );
+
+        insert new User(
+            FirstName = 'Test', 
+            LastName = 'User 5',
+            Email = 'testuser5@gmail.com',
+            Username = 'testuser5@sunmotors.com',
+            Alias = 'user5',
+            TimeZoneSidKey = 'America/Los_Angeles',
+            LocaleSidKey = 'en_US',
+            LanguageLocaleKey = 'en_US',
+            EmailEncodingKey = 'UTF-8',
+            ProfileId = appSubscriptionUserId,
+            UserRoleId = westernSalesTeamId
+        );
+
+        User Owner3Test = 
+        [
+            SELECT Id 
+            FROM User 
+            WHERE Username = 'testuser3@sunmotors.com'
+        ];
+
+        System.runAs(Owner3Test)
+        {
+            insert new Territory__c(
+                Name = 'Territory test 3', 
+                Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_1, 
+                Owner__c = Owner3Test.Id
+            );
+        }
+
+        User Owner4Test = 
+        [
+            SELECT Id 
+            FROM User 
+            WHERE Username = 'testuser4@sunmotors.com'
+        ];
+
+        System.runAs(Owner4Test)
+        {
+            insert new Territory__c(
+                Name = 'Territory test 4', 
+                Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_1, 
+                Owner__c = Owner4Test.Id
+            );
+        }
+
+        User Owner5Test = 
+        [
+            SELECT Id 
+            FROM User 
+            WHERE Username = 'testuser5@sunmotors.com'
+        ];
+
+        System.runAs(Owner5Test)
+        {
+            insert new Territory__c(
+                Name = 'Territory test 5', 
+                Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_2, 
+                Owner__c = Owner5Test.Id
+            );
+        }
+        
+        Territory__c territory5Test = 
+        [
+            SELECT Id, Zip_Code__c, Owner__c
+            FROM Territory__c 
+            WHERE Owner__c = :Owner5Test.Id
+        ];
+
+        // Act
+
+        Test.startTest();
+        
+        territory5Test.Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_1;
+        update territory5Test;
+
+        Test.stopTest();
     }
 }

@@ -10,36 +10,41 @@ private class AutomobileDealerRepairmentTest
     @isTest
     static void correctOwnershipAssignmentTest()
     {
-        Id OwnerId1Test = 
+        User Owner1Test = 
         [
             SELECT Id 
             FROM User 
             WHERE Username = :TestFactory.OWNER_USERNAME_TEST_1
-        ].Id;
+        ];
 
-        Id OwnerId2Test = 
+        User Owner2Test = 
         [
             SELECT Id 
             FROM User 
             WHERE Username = :TestFactory.OWNER_USERNAME_TEST_2
-        ].Id;
+        ];
         
         // Create test automobile dealers correctly assigned to their territories
 
-        insert new Account(
-            Name = 'Dealer test 2', 
-            BillingPostalCode = TestFactory.ZIP_CODE_DEALER_TEST_2, 
-            OwnerId = OwnerId2Test
-        );
+        System.runAs(Owner2Test)
+        {
+            insert new Account(
+                Name = 'Dealer test 2', 
+                BillingPostalCode = TestFactory.ZIP_CODE_DEALER_TEST_2, 
+                OwnerId = Owner2Test.Id
+            );
+        }
         
         //Act
 
         Test.startTest();
+
         System.schedule(
             'Test job 1', 
             TestFactory.CRON_EXP_EVERYDAY_AT_MIDNIGHT, 
             new AutomobileDealerRepairment()
         );
+
         Test.stopTest();
         
         // Verify ownership remains unchanged
@@ -50,8 +55,15 @@ private class AutomobileDealerRepairmentTest
             FROM Account
         ];
 
-        System.assertEquals(retrievedDealers[0].OwnerId, OwnerId1Test);
-        System.assertEquals(retrievedDealers[1].OwnerId, OwnerId2Test);
+        System.runAs(Owner1Test)
+        {
+            System.assertEquals(retrievedDealers[0].OwnerId, Owner1Test.Id);
+        }
+
+        System.runAs(Owner2Test)
+        {
+            System.assertEquals(retrievedDealers[1].OwnerId, Owner2Test.Id);
+        }
     }
 
     @isTest
@@ -59,28 +71,25 @@ private class AutomobileDealerRepairmentTest
     {
         Account retrievedDealer = 
         [
-            SELECT BillingPostalCode 
+            SELECT Id, BillingPostalCode 
             FROM Account
             WHERE Name = 'Dealer test 1'
             LIMIT 1  
         ];
 
+        // Act
+        
         retrievedDealer.BillingPostalCode = TestFactory.ZIP_CODE_DEALER_TEST_2;
         update retrievedDealer;
 
-        insert new cstm_AccountHistory__c(
-            Accounts__c = retrievedDealer.Id,
-            Field__c = 'BillingPostalCode',
-            OldValue__c = TestFactory.ZIP_CODE_DEALER_TEST_1
-        );
-
-        // Act
         Test.startTest();
+
         String jobId = System.schedule(
             'Test Job 2',
             TestFactory.CRON_EXP_EVERYDAY_AT_MIDNIGHT, 
             new AutomobileDealerRepairment()
         );
+
         Test.stopTest();
 
         retrievedDealer = 
@@ -91,14 +100,18 @@ private class AutomobileDealerRepairmentTest
             LIMIT 1  
         ];
 
-        Id OwnerId2Test = 
+        User Owner2Test = 
         [
             SELECT Id 
             FROM User 
             WHERE Username = :TestFactory.OWNER_USERNAME_TEST_2
-        ].Id;
+        ];
         
          // Verify ownership is correctly updated
-        System.assertEquals(retrievedDealer.OwnerId, OwnerId2Test);
+
+        System.runAs(Owner2Test)
+        {
+            System.assertEquals(retrievedDealer.OwnerId, Owner2Test.Id, 'Ownership was not updated correctly');
+        } 
     }
 }
