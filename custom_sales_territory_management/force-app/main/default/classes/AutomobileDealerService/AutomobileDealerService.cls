@@ -49,7 +49,7 @@ public class AutomobileDealerService
             if (territory.Zip_Code__c == zipCode && territory.Owner__c == ownerId)
                 return territory;
         }
-
+        
         return null;
     }
 
@@ -97,18 +97,27 @@ public class AutomobileDealerService
         {
             cstm_AccountHistory__c prevAutoDealerHistory = this.GetLastAutoDealerHistory(dealerAccount.Id);
             
-            Territory__c prevTerritory = this.SearchTerritory(
-                prevAutoDealerHistory.OldValue__c, 
-                dealerAccount.OwnerId
-            );
+            String OldZipCode = null;
+            Id OldCreatedBy = null;
+            Id prevTerritoryId = null;
+
+            if (prevAutoDealerHistory != null)
+            {
+                OldZipCode = prevAutoDealerHistory.OldValue__c;
+                OldCreatedBy = prevAutoDealerHistory.CreatedById;
+                prevTerritoryId = this.SearchTerritory(
+                    OldZipCode, 
+                    dealerAccount.OwnerId
+                ).Id;
+            }
 
             this.StoreAssignmentHistory(
                 dealerAccount.OwnerId, 
                 associatedTerritory.Owner__c,
-                prevTerritory.Id,
+                prevTerritoryId,
                 associatedTerritory.Id,
                 dealerAccount.Id,
-                prevAutoDealerHistory.CreatedById
+                OldCreatedBy
             );
 
             dealerAccount.OwnerId = associatedTerritory.Owner__c;
@@ -174,7 +183,7 @@ public class AutomobileDealerService
 
         this.dealerOpportunities = 
         [
-            SELECT Id, OwnerId
+            SELECT Id, OwnerId, AccountId, IsClosed
             FROM Opportunity
         ];
 
@@ -233,7 +242,10 @@ public class AutomobileDealerService
         }
 
         if (!this.ZipCodeAccountsHistoryToInsert.isEmpty())
+        {
             insert this.ZipCodeAccountsHistoryToInsert;
+            this.ZipCodeAccountsHistoryToInsert.clear();
+        }
     }
 
     // Filters Automobile Dealers based on whether Zip Codes has ever changed
@@ -244,11 +256,11 @@ public class AutomobileDealerService
         for (Account updatedAcc : updatedAccounts)
         {
             Account lastAccount = null;
-            for (cstm_AccountHistory__c history : this.ZipCodeAccountsHistoryToInsert)
+            for (cstm_AccountHistory__c history : this.OldZipCodeAccountsHistory)
             {
                 if (history.Accounts__c == updatedAcc.Id)
                     lastAccount = updatedAcc;
-            }
+            }            
             if (lastAccount != null)
                 mappedAccounts.add(lastAccount);
         }
@@ -319,6 +331,7 @@ public class AutomobileDealerService
         if (!this.assignmentsHistory.isEmpty())
         {
             insert this.assignmentsHistory;
+            this.assignmentsHistory.clear();
         }
     }
 }
