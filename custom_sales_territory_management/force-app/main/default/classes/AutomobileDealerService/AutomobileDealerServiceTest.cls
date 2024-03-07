@@ -135,7 +135,46 @@ private class AutomobileDealerServiceTest
     static void ThreeSalesRepsAtMostCanBeAssignedToAZipCodeTest()
     {
         // Create three more territories and three more sales reps related with the first dealer account
-        
+        insertNewUsers();
+        insertTerritories();
+
+        // Act
+        Test.startTest();
+        relatedTerritories();
+        Test.stopTest();
+
+        // Verify
+        List<Territory__c> territoriesWithFirstAccount = 
+        [
+            SELECT Id, Owner__c
+            FROM Territory__c 
+            WHERE Zip_Code__c = :TestFactory.ZIP_CODE_DEALER_TEST_1
+        ];
+        System.assertEquals(territoriesWithFirstAccount.size(), 3);
+    }
+
+    @future
+    private static void insertTerritories()
+    {
+        insert new Territory__c(
+            Name = 'Territory test 3', 
+            Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_1
+        );
+
+        insert new Territory__c(
+            Name = 'Territory test 4', 
+            Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_1
+        );
+
+        insert new Territory__c(
+            Name = 'Territory test 5', 
+            Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_2
+        );
+    }
+
+    @future
+    private static void insertNewUsers()
+    {
         Id appSubscriptionUserId = 
         [
             SELECT Id 
@@ -196,21 +235,31 @@ private class AutomobileDealerServiceTest
             ProfileId = appSubscriptionUserId,
             UserRoleId = westernSalesTeamId
         );
+    }
 
+    @future
+    private static void relatedTerritories()
+    {
         User Owner3Test = 
         [
             SELECT Id 
             FROM User 
             WHERE Username = 'testuser3@sunmotors.com'
+            LIMIT 1 
         ];
 
+        Territory__c territory3Test = 
+        [
+            SELECT Id, Zip_Code__c, Owner__c
+            FROM Territory__c 
+            WHERE Name = 'Territory test 3'
+            LIMIT 1
+        ];
+        
         System.runAs(Owner3Test)
         {
-            insert new Territory__c(
-                Name = 'Territory test 3', 
-                Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_1, 
-                Owner__c = Owner3Test.Id
-            );
+            territory3Test.Owner__c = Owner3Test.Id;
+            update territory3Test;
         }
 
         User Owner4Test = 
@@ -218,15 +267,21 @@ private class AutomobileDealerServiceTest
             SELECT Id 
             FROM User 
             WHERE Username = 'testuser4@sunmotors.com'
+            LIMIT 1
+        ];
+
+        Territory__c territory4Test = 
+        [
+            SELECT Id, Zip_Code__c, Owner__c
+            FROM Territory__c 
+            WHERE Name = 'Territory test 4'
+            LIMIT 1
         ];
 
         System.runAs(Owner4Test)
         {
-            insert new Territory__c(
-                Name = 'Territory test 4', 
-                Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_1, 
-                Owner__c = Owner4Test.Id
-            );
+            territory4Test.Owner__c = Owner4Test.Id;
+            update territory4Test;
         }
 
         User Owner5Test = 
@@ -234,31 +289,32 @@ private class AutomobileDealerServiceTest
             SELECT Id 
             FROM User 
             WHERE Username = 'testuser5@sunmotors.com'
+            LIMIT 1
         ];
 
-        System.runAs(Owner5Test)
-        {
-            insert new Territory__c(
-                Name = 'Territory test 5', 
-                Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_2, 
-                Owner__c = Owner5Test.Id
-            );
-        }
-        
         Territory__c territory5Test = 
         [
             SELECT Id, Zip_Code__c, Owner__c
             FROM Territory__c 
-            WHERE Owner__c = :Owner5Test.Id
+            WHERE Name = 'Territory test 5'
+            LIMIT 1
         ];
 
-        // Act
-
-        Test.startTest();
-        
-        territory5Test.Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_1;
-        update territory5Test;
-
-        Test.stopTest();
+        System.runAs(Owner5Test)
+        {
+            territory5Test.Owner__c = Owner5Test.Id;
+            update territory5Test;
+            territory5Test = 
+            [
+                SELECT Id, Zip_Code__c, Owner__c
+                FROM Territory__c 
+                WHERE Name = 'Territory test 5'
+                LIMIT 1
+            ];
+            // should fail
+            territory5Test.Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_1;
+            update territory5Test;
+        }
     }
+        
 }

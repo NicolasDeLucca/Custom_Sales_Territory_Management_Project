@@ -9,6 +9,13 @@ public class TestFactory
     // Insertion of two users, two territories and one dealer account
     public static void insertTerritoryManagementData()
     {
+        insertSalesRep();
+        insertTerritories();
+        insertDealerAccount();
+    }
+
+    private static void insertSalesRep()
+    {
         insert new User(
             FirstName = 'Test', 
             LastName = 'User 1',
@@ -50,7 +57,10 @@ public class TestFactory
                 WHERE Name = 'System Administrator'
             ].Id
         );
+    }
 
+    private static void insertTerritories()
+    {
         User Owner1Test = 
         [
             SELECT Id 
@@ -66,15 +76,6 @@ public class TestFactory
                 Owner__c = Owner1Test.Id
             ); 
         }
-
-        System.runAs(Owner1Test)
-        {
-            insert new Account(
-                Name = 'Dealer test 1', 
-                BillingPostalCode = ZIP_CODE_DEALER_TEST_1, 
-                OwnerId = Owner1Test.Id
-            );
-        }
         
         User Owner2Test = 
         [
@@ -89,6 +90,25 @@ public class TestFactory
                 Name = 'Territory test 2', 
                 Zip_Code__c = ZIP_CODE_DEALER_TEST_2, 
                 Owner__c = Owner2Test.Id
+            );
+        }
+    }
+
+    private static void insertDealerAccount()
+    {
+        User Owner1Test = 
+        [
+            SELECT Id 
+            FROM User 
+            WHERE Username = :OWNER_USERNAME_TEST_1
+        ];
+
+        System.runAs(Owner1Test)
+        {
+            insert new Account(
+                Name = 'Dealer test 1', 
+                BillingPostalCode = ZIP_CODE_DEALER_TEST_1, 
+                OwnerId = Owner1Test.Id
             );
         }
     }
