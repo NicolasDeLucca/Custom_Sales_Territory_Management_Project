@@ -255,12 +255,6 @@ private class AutomobileDealerServiceTest
             WHERE Name = 'Territory test 3'
             LIMIT 1
         ];
-        
-        System.runAs(Owner3Test)
-        {
-            territory3Test.Owner__c = Owner3Test.Id;
-            update territory3Test;
-        }
 
         User Owner4Test = 
         [
@@ -278,12 +272,6 @@ private class AutomobileDealerServiceTest
             LIMIT 1
         ];
 
-        System.runAs(Owner4Test)
-        {
-            territory4Test.Owner__c = Owner4Test.Id;
-            update territory4Test;
-        }
-
         User Owner5Test = 
         [
             SELECT Id 
@@ -300,6 +288,18 @@ private class AutomobileDealerServiceTest
             LIMIT 1
         ];
 
+        System.runAs(Owner3Test)
+        {
+            territory3Test.Owner__c = Owner3Test.Id;
+            update territory3Test;
+        }
+            
+        System.runAs(Owner4Test)
+        {
+            territory4Test.Owner__c = Owner4Test.Id;
+            update territory4Test;
+        }
+
         System.runAs(Owner5Test)
         {
             territory5Test.Owner__c = Owner5Test.Id;
@@ -311,10 +311,11 @@ private class AutomobileDealerServiceTest
                 WHERE Name = 'Territory test 5'
                 LIMIT 1
             ];
+
             // should fail
             territory5Test.Zip_Code__c = TestFactory.ZIP_CODE_DEALER_TEST_1;
             update territory5Test;
-        }
+        } 
     }
-        
+      
 }

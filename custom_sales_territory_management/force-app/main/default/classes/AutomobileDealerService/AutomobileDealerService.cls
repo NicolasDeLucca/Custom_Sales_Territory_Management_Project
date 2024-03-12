@@ -40,7 +40,7 @@ public class AutomobileDealerService
                 count ++;
         }
 
-        return count <= 3;
+        return count < 3;
     }
 
     private static cstm_AccountHistory__c GetLastAutoDealerHistory(Id dealerAccountId)
@@ -347,7 +347,7 @@ public class AutomobileDealerService
 
     public void UpdateDataModelOwners(List<Account> mappedDealers)
     { 
-        if(!System.isFuture() && !System.isBatch())
+        if(!System.isFuture())
         {
             List<Account> retrievedDealers = 
             [
