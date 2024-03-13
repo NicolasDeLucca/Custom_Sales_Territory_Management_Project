@@ -9,4 +9,5 @@
     <trackHistory>true</trackHistory>
     <trackTrending>false</trackTrending>
     <type>Text</type>
+    <unique>false</unique>
 </CustomField>
