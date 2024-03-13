@@ -1,46 +1,27 @@
 public class AutomobileDealerService
 {
+    public static final String ZIP_CODE_ERROR_MESSAGE = 'The zip code is already assigned to three sales representatives';
+    
     private static List<Assignment_History__c> assignmentsHistoryToInsert { get; private set; }
     private static List<Assignment_History__c> oldAssigmentHistory { get; private set; }
     private static List<cstm_AccountHistory__c> zipCodeAutoDealersToArchive { get; private set; }
     private static List<cstm_AccountHistory__c> oldZipCodeAutoDealersHistory { get; private set; }
-    private static List<Territory__c> territories { get; private set; }
     private static List<Contact> dealersEmployees { get; private set; }
     private static List<Opportunity> dealerOpportunities { get; private set; }
     private static List<Account> automobileDealers { get; private set; }
     
-    private static Territory__c GetTerritoryByZipCode(String zipCode)
+    // use a random function to select one of the assigned sales representatives
+    private static Territory__c GetRandomTerritory(List<Territory__c> territories)
     {
-        List<Territory__c> possibleTerritories = new List<Territory__c>();
-        for (Territory__c territory : territories)
-        {
-            if (territory.Zip_Code__c == zipCode)
-                possibleTerritories.add(territory);
-        }
-
-        Integer territoriesSize = possibleTerritories.size();
+        Integer territoriesSize = territories.size();
         if (territoriesSize > 0)
         {
-            // use a random function to select one of the assigned sales representatives
             Integer randomInt = Math.floor(Math.random()).intValue();
             Integer randomIndex = Math.Mod(randomInt, territoriesSize);
-            return possibleTerritories[randomIndex];
+            return territories[randomIndex];
         }
 
         return null;
-    }
-
-    // Three sales representatives at most can be assigned to a single zip code.
-    private static Boolean IsZipCodeAssignable(String zipCode)
-    {
-        Integer count = 0;
-        for (Territory__c territory : territories)
-        {
-            if (territory.Zip_Code__c == zipCode)
-                count ++;
-        }
-
-        return count < 3;
     }
 
     private static cstm_AccountHistory__c GetLastAutoDealerHistory(Id dealerAccountId)
@@ -90,43 +71,31 @@ public class AutomobileDealerService
     }
     
     // Change the Account Owner to the sales representative assigned to the new zip code
-    private static Account ReassignAccountOwner(Account dealerAccount)
+    private static Account ReassignAccountOwner(Territory__c associatedTerritory, Account dealerAccount)
     {
-        Territory__c associatedTerritory = GetTerritoryByZipCode(dealerAccount.BillingPostalCode);
-        Boolean isAssignable = IsZipCodeAssignable(dealerAccount.BillingPostalCode);
-        
-        if (associatedTerritory != null && isAssignable)
+        cstm_AccountHistory__c prevAutoDealerHistory = GetLastAutoDealerHistory(dealerAccount.Id);
+
+        String OldZipCode = null;
+        Id OldCreatedBy = null;
+        Id prevTerritoryId = GetLastTerritoryId(associatedTerritory.Id);
+
+        if (prevAutoDealerHistory != null)
         {
-            cstm_AccountHistory__c prevAutoDealerHistory = GetLastAutoDealerHistory(dealerAccount.Id);
-
-            String OldZipCode = null;
-            Id OldCreatedBy = null;
-            Id prevTerritoryId = GetLastTerritoryId(associatedTerritory.Id);
-
-            if (prevAutoDealerHistory != null)
-            {
-                OldZipCode = prevAutoDealerHistory.OldValue__c;
-                OldCreatedBy = prevAutoDealerHistory.CreatedById;
-            }
-
-            StoreAssignmentHistory(
-                dealerAccount.OwnerId, 
-                associatedTerritory.Owner__c,
-                prevTerritoryId,
-                associatedTerritory.Id,
-                dealerAccount.Id,
-                OldCreatedBy
-            );
-
-            dealerAccount.OwnerId = associatedTerritory.Owner__c;
-            return dealerAccount;
-        }
-        else if (!isAssignable)
-        {
-            associatedTerritory.addError('The zip code is already assigned to three sales representatives');
+            OldZipCode = prevAutoDealerHistory.OldValue__c;
+            OldCreatedBy = prevAutoDealerHistory.CreatedById;
         }
 
-        return null;
+        StoreAssignmentHistory(
+            dealerAccount.OwnerId, 
+            associatedTerritory.Owner__c,
+            prevTerritoryId,
+            associatedTerritory.Id,
+            dealerAccount.Id,
+            OldCreatedBy
+        );
+
+        dealerAccount.OwnerId = associatedTerritory.Owner__c;
+        return dealerAccount;
     }
 
     // Change the Owner field of all the Account’s Contacts to the same sales rep
@@ -175,24 +144,55 @@ public class AutomobileDealerService
             WHERE Id IN :updatedAccountsId
         ];
 
+        Map<Account, String> billingPostalCodes = new Map<Account, String>();
+        for (Account acc : updatedAccounts)
+        {
+            billingPostalCodes.put(acc, acc.BillingPostalCode);
+        } 
+
+        List<Territory__c> relatedTerritories = 
+        [
+            SELECT Id, Owner__c, Zip_Code__c
+            FROM Territory__c
+            WHERE Zip_Code__c IN :billingPostalCodes.values()
+        ];
+
         List<Contact> contactsToUpdate = new List<Contact>();
         List<Opportunity> opportunitiesToUpdate = new List<Opportunity>();
         List<Account> accountsToUpdate = new List<Account>();
 
         for (Account updatedAcc : updatedAccounts)
         {
-            Account accountToUpdate = ReassignAccountOwner(updatedAcc);
-            if (accountToUpdate != null)
+            List<Territory__c> territories = new List<Territory__c>();
+            String zipCode = billingPostalCodes.get(updatedAcc);
+
+            for (Territory__c territory : relatedTerritories)
             {
-                List<Contact> newContactsToUpdate = 
-                    ReassignContactsOwner(updatedAcc, accountToUpdate.OwnerId);
-                    
-                List<Opportunity> newOppsToUpdate = 
-                    ReassignOpenOpportunitiesOwner(updatedAcc, accountToUpdate.OwnerId);
-                    
-                accountsToUpdate.add(accountToUpdate);
-                contactsToUpdate.addAll(newContactsToUpdate);
-                opportunitiesToUpdate.addAll(newOppsToUpdate);
+                if (territory.Zip_Code__c == zipCode)
+                    territories.add(territory);
+            }
+
+            Territory__c associatedTerritory = GetRandomTerritory(territories);
+        
+            if (associatedTerritory != null)
+            {
+                if (territories.size() < 3)
+                {
+                    Account accountToUpdate = ReassignAccountOwner(associatedTerritory, updatedAcc);
+                    List<Contact> newContactsToUpdate = 
+                        ReassignContactsOwner(updatedAcc, accountToUpdate.OwnerId);
+                            
+                    List<Opportunity> newOppsToUpdate = 
+                        ReassignOpenOpportunitiesOwner(updatedAcc, accountToUpdate.OwnerId);
+                            
+                    accountsToUpdate.add(accountToUpdate);
+                    contactsToUpdate.addAll(newContactsToUpdate);
+                    opportunitiesToUpdate.addAll(newOppsToUpdate);
+                }
+                else
+                {
+                    associatedTerritory.addError(ZIP_CODE_ERROR_MESSAGE);
+                }
             }
         }
         
@@ -220,12 +220,6 @@ public class AutomobileDealerService
 
     public AutomobileDealerService()
     {
-        territories = 
-        [
-            SELECT Id, Zip_Code__c, Owner__c
-            FROM Territory__c
-        ];
-
         dealersEmployees = 
         [
             SELECT Id, AccountId 
@@ -259,6 +253,29 @@ public class AutomobileDealerService
         assignmentsHistoryToInsert = new List<Assignment_History__c>();
         zipCodeAutoDealersToArchive = new List<cstm_AccountHistory__c>();
     }
+
+    // Check if the zip code is already assigned to three sales representatives
+    public void ProcessTerritoryUpsertion(List<Territory__c> territoriesToUpsert)
+    {
+        List<Territory__c> actualTerritories = 
+        [
+            SELECT Zip_Code__c 
+            FROM Territory__c
+        ];
+
+        for (Territory__c territoryToUpsert : territoriesToUpsert)
+        {
+            Integer territoriesWithSameZipCodeSize = 0;
+            for (Territory__c actualTerritory : actualTerritories)
+            {
+                if (territoryToUpsert.Zip_Code__c == actualTerritory.Zip_Code__c)
+                    territoriesWithSameZipCodeSize++;
+            }
+
+            if (territoriesWithSameZipCodeSize == 3)
+                territoryToUpsert.addError(ZIP_CODE_ERROR_MESSAGE);
+        }
+    }    
 
     // Save the dealers with new zip code in custom object AccountHistory records
     public void ProcessAccountHistory(List<Account> accountsToSave)
@@ -320,6 +337,7 @@ public class AutomobileDealerService
         return mappedAccounts;
     }
 
+    // Get the dealers with the territory owner changed
     public List<Account> GetAutoDealersWithTerritoryOwnerChanged(
         Map<Id, Territory__c> oldTerritoriesMap, 
         List<Territory__c> newTerritories
