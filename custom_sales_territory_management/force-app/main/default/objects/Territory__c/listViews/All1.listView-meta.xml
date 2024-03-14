@@ -5,5 +5,5 @@
     <columns>Zip_Code__c</columns>
     <columns>Owner__c</columns>
     <filterScope>Everything</filterScope>
-    <label>All</label>
+    <label>All Territories</label>
 </ListView>
