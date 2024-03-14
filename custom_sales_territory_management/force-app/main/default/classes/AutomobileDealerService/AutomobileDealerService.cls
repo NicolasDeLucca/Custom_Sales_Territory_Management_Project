@@ -1,6 +1,6 @@
 public class AutomobileDealerService
 {
-    private static List<Assignment_History__c> assignmentsHistoryToInsert { get; set; }
+    private static List<Assignment_History__c> assignmentsHistoryToInsert { get; private set; }
     public static final String ZIP_CODE_ERROR_MESSAGE = 'The zip code is already assigned to three sales representatives';
     
     public AutomobileDealerService()
@@ -140,15 +140,16 @@ public class AutomobileDealerService
         return openOppsToReassign;
     }
 
+    @future
     private static void UpdateDataModelOwnersByAccountsId(Set<Id> updatedAccountsId)
     {
         List<Account> updatedAccounts = 
         [
-            SELECT Id, OwnerId, BillingPostalCode 
-            FROM Account 
+            SELECT Id, OwnerId, BillingPostalCode
+            FROM Account
             WHERE Id IN :updatedAccountsId
         ];
-
+        
         Set<String> billingPostalCodes = new Set<String>();
         for (Account acc : updatedAccounts)
             billingPostalCodes.add(acc.BillingPostalCode);
@@ -220,7 +221,7 @@ public class AutomobileDealerService
             assignmentsHistoryToInsert.clear();
         }
     }
-    
+
     // Check if the zip code is already assigned to three sales representatives
     public void ProcessTerritoryUpsertion(List<Territory__c> territoriesToUpsert)
     {
@@ -351,10 +352,13 @@ public class AutomobileDealerService
 
     public void UpdateDataModelOwners(List<Account> mappedDealers)
     { 
-        Set<Id> mappedDealersId = new Set<Id>();
-        for (Account acc : mappedDealers)
-            mappedDealersId.add(acc.Id);
-        
-        UpdateDataModelOwnersByAccountsId(mappedDealersId);
-    }
+        if (!System.isFuture())
+        {
+            Set<Id> mappedDealersId = new Set<Id>();
+            for (Account acc : mappedDealers)
+                mappedDealersId.add(acc.Id);
+
+            UpdateDataModelOwnersByAccountsId(mappedDealersId);
+        }
+    }  
 }
