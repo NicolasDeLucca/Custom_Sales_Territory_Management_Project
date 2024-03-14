@@ -1,15 +1,13 @@
 public class AutomobileDealerService
 {
+    private static List<Assignment_History__c> assignmentsHistoryToInsert { get; set; }
     public static final String ZIP_CODE_ERROR_MESSAGE = 'The zip code is already assigned to three sales representatives';
     
-    private static List<Assignment_History__c> assignmentsHistoryToInsert { get; private set; }
-    private static List<Assignment_History__c> oldAssigmentHistory { get; private set; }
-    private static List<cstm_AccountHistory__c> zipCodeAutoDealersToArchive { get; private set; }
-    private static List<cstm_AccountHistory__c> oldZipCodeAutoDealersHistory { get; private set; }
-    private static List<Contact> dealersEmployees { get; private set; }
-    private static List<Opportunity> dealerOpportunities { get; private set; }
-    private static List<Account> automobileDealers { get; private set; }
-    
+    public AutomobileDealerService()
+    {
+        assignmentsHistoryToInsert = new List<Assignment_History__c>();
+    }
+
     // use a random function to select one of the assigned sales representatives
     private static Territory__c GetRandomTerritory(List<Territory__c> territories)
     {
@@ -26,26 +24,29 @@ public class AutomobileDealerService
 
     private static cstm_AccountHistory__c GetLastAutoDealerHistory(Id dealerAccountId)
     {
-        cstm_AccountHistory__c lastHistory = null;
-        for (cstm_AccountHistory__c history : oldZipCodeAutoDealersHistory)
-        {
-            if (history.Accounts__c == dealerAccountId)
-                lastHistory = history;
-        }
+        List<cstm_AccountHistory__c> oldZipCodeAutoDealerHistory = 
+        [
+            SELECT Id, Accounts__c, OldValue__c, CreatedById
+            FROM cstm_AccountHistory__c
+            WHERE Field__c = 'BillingPostalCode'
+            AND Accounts__c = :dealerAccountId
+            ORDER BY CreatedDate DESC
+        ];
 
-        return lastHistory;
+        return oldZipCodeAutoDealerHistory.isEmpty() ? null : oldZipCodeAutoDealerHistory[0];
     } 
 
     private static Id GetLastTerritoryId(Id territoryId)
     {
-        Id lastTerritoryId = null;
-        for (Assignment_History__c history : oldAssigmentHistory)
-        {
-            if (history.New_Territory__c == territoryId)
-                lastTerritoryId = history.Previous_Territory__c;
-        }
+        List<Assignment_History__c> oldAssigmentHistory = 
+        [
+            SELECT New_Territory__c, Previous_Territory__c
+            FROM Assignment_History__c
+            WHERE New_Territory__c = :territoryId
+            ORDER BY CreatedDate DESC
+        ];
 
-        return lastTerritoryId;
+        return oldAssigmentHistory.isEmpty() ? null : oldAssigmentHistory[0].Previous_Territory__c;
     }
 
     private static void StoreAssignmentHistory(
@@ -101,40 +102,44 @@ public class AutomobileDealerService
     // Change the Owner field of all the Account’s Contacts to the same sales rep
     private static List<Contact> ReassignContactsOwner(Account dealerAccount, Id newOwnerId)
     {
-        List<Contact> accountEmployees = new List<Contact>();
-        for (Contact employee : dealersEmployees)
+        List<Contact> contactsToReassign = new List<Contact>();
+        List<Contact> dealerEmployees = 
+        [
+            SELECT Id, AccountId 
+            FROM Contact
+            WHERE AccountId = :dealerAccount.Id
+        ];
+
+        for (Contact employeeToUpdate : dealerEmployees)
         {
-            if (employee.AccountId == dealerAccount.Id)
-                accountEmployees.add(employee);
+            employeeToUpdate.OwnerId = newOwnerId;
+            contactsToReassign.add(employeeToUpdate);
         }
 
-        for (Contact employeesToUpdate : accountEmployees)
-        {
-            employeesToUpdate.OwnerId = newOwnerId;
-        }
-
-        return accountEmployees;
+        return contactsToReassign;
     }
 
     // Change the Owner field of all the Account’s Open Opportunities to the same sales rep
     private static List<Opportunity> ReassignOpenOpportunitiesOwner(Account dealerAccount, Id newOwnerId)
     {
-        List<Opportunity> dealerOpenOpportunities = new List<Opportunity>();
-        for (Opportunity opp : dealerOpportunities)
+        List<Opportunity> openOppsToReassign = new List<Opportunity>();
+        List<Opportunity> dealerOpenOpportunities = 
+        [
+            SELECT Id, OwnerId, AccountId, IsClosed
+            FROM Opportunity
+            WHERE AccountId = :dealerAccount.Id
+            AND IsClosed = false
+        ];
+
+        for (Opportunity opportunityToUpdate : dealerOpenOpportunities)
         {
-            if (opp.AccountId == dealerAccount.Id && opp.IsClosed == false)
-                dealerOpenOpportunities.add(opp);
+            opportunityToUpdate.OwnerId = newOwnerId;
+            openOppsToReassign.add(opportunityToUpdate);
         }
 
-        for (Opportunity opportunitiesToUpdate : dealerOpenOpportunities)
-        {
-            opportunitiesToUpdate.OwnerId = newOwnerId;
-        }
-
-        return dealerOpenOpportunities;
+        return openOppsToReassign;
     }
 
-    @future
     private static void UpdateDataModelOwnersByAccountsId(Set<Id> updatedAccountsId)
     {
         List<Account> updatedAccounts = 
@@ -144,17 +149,15 @@ public class AutomobileDealerService
             WHERE Id IN :updatedAccountsId
         ];
 
-        Map<Account, String> billingPostalCodes = new Map<Account, String>();
+        Set<String> billingPostalCodes = new Set<String>();
         for (Account acc : updatedAccounts)
-        {
-            billingPostalCodes.put(acc, acc.BillingPostalCode);
-        } 
+            billingPostalCodes.add(acc.BillingPostalCode);
 
         List<Territory__c> relatedTerritories = 
         [
             SELECT Id, Owner__c, Zip_Code__c
             FROM Territory__c
-            WHERE Zip_Code__c IN :billingPostalCodes.values()
+            WHERE Zip_Code__c IN :billingPostalCodes
         ];
 
         List<Contact> contactsToUpdate = new List<Contact>();
@@ -164,7 +167,7 @@ public class AutomobileDealerService
         for (Account updatedAcc : updatedAccounts)
         {
             List<Territory__c> territories = new List<Territory__c>();
-            String zipCode = billingPostalCodes.get(updatedAcc);
+            String zipCode = updatedAcc.BillingPostalCode;
 
             for (Territory__c territory : relatedTerritories)
             {
@@ -217,43 +220,7 @@ public class AutomobileDealerService
             assignmentsHistoryToInsert.clear();
         }
     }
-
-    public AutomobileDealerService()
-    {
-        dealersEmployees = 
-        [
-            SELECT Id, AccountId 
-            FROM Contact
-        ];
-
-        dealerOpportunities = 
-        [
-            SELECT Id, OwnerId, AccountId, IsClosed
-            FROM Opportunity
-        ];
-
-        automobileDealers = 
-        [
-            SELECT Id, OwnerId, BillingPostalCode
-            FROM Account
-        ];
-
-        oldZipCodeAutoDealersHistory =
-        [
-            SELECT Accounts__c, OldValue__c, Field__c, CreatedById
-            FROM cstm_AccountHistory__c
-        ];
-
-        oldAssigmentHistory =
-        [
-            SELECT Previous_Territory__c, New_Territory__c
-            FROM Assignment_History__c
-        ];
-        
-        assignmentsHistoryToInsert = new List<Assignment_History__c>();
-        zipCodeAutoDealersToArchive = new List<cstm_AccountHistory__c>();
-    }
-
+    
     // Check if the zip code is already assigned to three sales representatives
     public void ProcessTerritoryUpsertion(List<Territory__c> territoriesToUpsert)
     {
@@ -275,19 +242,27 @@ public class AutomobileDealerService
             if (territoriesWithSameZipCodeSize == 3)
                 territoryToUpsert.addError(ZIP_CODE_ERROR_MESSAGE);
         }
-    }    
+    } 
 
     // Save the dealers with new zip code in custom object AccountHistory records
     public void ProcessAccountHistory(List<Account> accountsToSave)
     {
+        List<cstm_AccountHistory__c> zipCodeAutoDealersToArchive = new List<cstm_AccountHistory__c>();
         if (!accountsToSave.isEmpty())
         {
             String oldValue = null;
+            List<cstm_AccountHistory__c> oldZipCodeAutoDealersHistory = 
+            [
+                SELECT Id, Accounts__c, OldValue__c, CreatedById
+                FROM cstm_AccountHistory__c
+                WHERE Field__c = 'BillingPostalCode'
+                AND Accounts__c = :accountsToSave[0].Id
+                ORDER BY CreatedDate ASC
+            ];
+            
             if (!oldZipCodeAutoDealersHistory.isEmpty())
             {
-                Integer lastHistoryIndex = oldZipCodeAutoDealersHistory.size() - 1;
-                cstm_AccountHistory__c lastHistory = oldZipCodeAutoDealersHistory[lastHistoryIndex];
-                oldValue = lastHistory.OldValue__c;
+                oldValue = oldZipCodeAutoDealersHistory[0].OldValue__c;
             }
 
             cstm_AccountHistory__c newHistory = new cstm_AccountHistory__c
@@ -304,7 +279,6 @@ public class AutomobileDealerService
         {
             Account prevAcc = accountsToSave[i-1];
             Account actualAcc = accountsToSave[i];
-
             cstm_AccountHistory__c newHistory = new cstm_AccountHistory__c
             (
                 Accounts__c = actualAcc.Id,
@@ -316,9 +290,7 @@ public class AutomobileDealerService
         }
         
         if (!zipCodeAutoDealersToArchive.isEmpty())
-        {
             insert zipCodeAutoDealersToArchive;
-        }
     }
 
     public List<Account> GetAutoDealersWithZipCodeChanged(
@@ -330,32 +302,46 @@ public class AutomobileDealerService
         for (Account acc : updatedAccounts)
         {
             Account prevAcc = prevAccountsMap.get(acc.Id);
-            if (prevAcc.BillingPostalCode != acc.BillingPostalCode)
+            if (prevAcc != null && prevAcc.BillingPostalCode != acc.BillingPostalCode)
                 mappedAccounts.add(acc);
         }
         
         return mappedAccounts;
     }
 
-    // Get the dealers with the territory owner changed
     public List<Account> GetAutoDealersWithTerritoryOwnerChanged(
         Map<Id, Territory__c> oldTerritoriesMap, 
         List<Territory__c> newTerritories
     )
     {
         List<Account> accountsToUpdate = new List<Account>();
-        for (Territory__c updTerritory : newTerritories)
+        Set<Id> oldOwnerIds = new Set<Id>();
+
+        for (Territory__c newTerritory : newTerritories)
         {
-            Territory__c oldTerritory = oldTerritoriesMap.get(updTerritory.Id);
-            if (updTerritory.Owner__c != oldTerritory.Owner__c)
+            Territory__c oldTerritory = oldTerritoriesMap.get(newTerritory.Id);
+            if (oldTerritory != null && newTerritory.Owner__c != oldTerritory.Owner__c)
+                oldOwnerIds.add(oldTerritory.Owner__c);
+        }
+
+        List<Account> automobileDealersToUpdate = 
+        [
+            SELECT Id, OwnerId, BillingPostalCode
+            FROM Account
+            WHERE OwnerId IN :oldOwnerIds
+        ];
+
+        for (Account dealer : automobileDealersToUpdate)
+        {
+            for (Territory__c newTerritory : newTerritories)
             {
-                for (Account acc : automobileDealers)
+                if (
+                    dealer.OwnerId == newTerritory.Owner__c && 
+                    dealer.BillingPostalCode == newTerritory.Zip_Code__c
+                ) 
                 {
-                    if (
-                        acc.OwnerId == oldTerritory.Owner__c && 
-                        acc.BillingPostalCode == updTerritory.Zip_Code__c
-                    )
-                        accountsToUpdate.add(acc);
+                    accountsToUpdate.add(dealer);
+                    break;
                 }
             }
         }
@@ -365,17 +351,10 @@ public class AutomobileDealerService
 
     public void UpdateDataModelOwners(List<Account> mappedDealers)
     { 
-        if(!System.isFuture())
-        {
-            List<Account> retrievedDealers = 
-            [
-                SELECT Id
-                FROM Account
-                WHERE Id IN :mappedDealers
-            ];
+        Set<Id> mappedDealersId = new Set<Id>();
+        for (Account acc : mappedDealers)
+            mappedDealersId.add(acc.Id);
         
-            Set<Id> mappedDealersId = new Map<Id, Account>(retrievedDealers).keySet();
-            UpdateDataModelOwnersByAccountsId(mappedDealersId);
-        }
+        UpdateDataModelOwnersByAccountsId(mappedDealersId);
     }
 }

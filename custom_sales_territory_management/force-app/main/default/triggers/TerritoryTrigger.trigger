@@ -2,7 +2,11 @@ trigger TerritoryTrigger on Territory__c (before insert, before update, after up
 {
     AutomobileDealerService dealerService = new AutomobileDealerService();
     
-    if (Trigger.isAfter && Trigger.isUpdate)
+    if (Trigger.isBefore)
+    {
+        dealerService.ProcessTerritoryUpsertion(Trigger.New);
+    }
+    else // Trigger.isAfter
     {
         List<Account> dealersToUpdate = dealerService.GetAutoDealersWithTerritoryOwnerChanged(
             Trigger.OldMap, 
@@ -10,9 +14,5 @@ trigger TerritoryTrigger on Territory__c (before insert, before update, after up
         );
 
         dealerService.UpdateDataModelOwners(dealersToUpdate);
-    }
-    else if (Trigger.isBefore)
-    {
-        dealerService.ProcessTerritoryUpsertion(Trigger.New);
     }
 }
