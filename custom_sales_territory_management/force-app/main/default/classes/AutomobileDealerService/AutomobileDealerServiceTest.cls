@@ -149,7 +149,6 @@ private class AutomobileDealerServiceTest
         insertionTest();
     }
 
-    @future
     private static void insertBaseTerritories()
     {
         User Owner3Test = 
@@ -187,7 +186,6 @@ private class AutomobileDealerServiceTest
         }
     }
 
-    @future
     private static void insertBaseUsers()
     {
         Id appSubscriptionUserId = 
@@ -252,7 +250,6 @@ private class AutomobileDealerServiceTest
         );
     }     
 
-    @future
     private static void updateTest()
     {
         User Owner5Test = 
@@ -292,7 +289,6 @@ private class AutomobileDealerServiceTest
         }
     }
 
-    @future
     private static void insertionTest()
     {
         User Owner5Test = 
